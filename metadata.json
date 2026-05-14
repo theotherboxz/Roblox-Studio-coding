@@ -1,0 +1,6 @@
+{
+  "name": "Roblox Studio Web AI",
+  "description": "A Roblox Studio-inspired web app with an AI assistant that can generate and modify workspace objects.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
