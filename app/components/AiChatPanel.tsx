@@ -112,7 +112,7 @@ Remember to output standard text describing what you are doing alongside the <ac
         ...updatedHistory.map(m => ({ role: m.role, content: m.content }))
       ];
 
-      const response = await puter.ai.chat(messages, { model: 'claude-3-5-sonnet' });
+      const response = await puter.ai.chat(messages, { model: 'claude-sonnet-4-5' });
       const rawOutput = typeof response === 'string' ? response : (response?.message?.content || '');
 
       const textOutput = processResponseActions(rawOutput);
@@ -207,3 +207,4 @@ Remember to output standard text describing what you are doing alongside the <ac
     </div>
   );
 }
+ 
