@@ -288,7 +288,7 @@ export function ExplorerPanel() {
   };
 
   const addObject = (type: ObjectType) => {
-    const newId = `obj-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const newId = `obj-${crypto.randomUUID()}`;
     const newObj: NodeObject = {
       id: newId,
       type,
