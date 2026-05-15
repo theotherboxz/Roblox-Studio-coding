@@ -104,7 +104,6 @@ Remember to output standard text describing what you are doing alongside the <ac
 
     try {
       // Puter.js chat
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const puter = (window as any).puter;
       if (!puter) throw new Error("Puter.js not loaded");
 
