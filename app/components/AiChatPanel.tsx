@@ -113,7 +113,22 @@ Remember to output standard text describing what you are doing alongside the <ac
       ];
 
       const response = await puter.ai.chat(messages, { model: 'claude-sonnet-4-6' });
-      const rawOutput = typeof response === 'string' ? response : (response?.message?.content || '');
+      let rawOutput = '';
+      if (typeof response === 'string') {
+        rawOutput = response;
+      } else if (response?.message?.content) {
+        const content = response.message.content;
+        if (typeof content === 'string') {
+          rawOutput = content;
+        } else if (Array.isArray(content)) {
+          rawOutput = (content as any[])
+            .filter((c) => c.type === 'text')
+            .map((c) => c.text)
+            .join('');
+        }
+      } else if (typeof response?.text === 'string') {
+        rawOutput = response.text;
+      }
 
       const textOutput = processResponseActions(rawOutput);
 
