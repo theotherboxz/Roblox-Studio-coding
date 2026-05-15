@@ -35,15 +35,21 @@ If they ask for a script that does something, write the Lua code inside the "cod
 Remember to output standard text describing what you are doing alongside the <action> tags. Do not put backticks around the action tags.`;
   };
 
-  const processResponseActions = (text: string) => {
+  const processResponseActions = (rawText: unknown) => {
+    // Guard: ensure we always work with a string
+    const text = typeof rawText === 'string' ? rawText : String(rawText ?? '');
+
     let newObjects = [...objects];
     let justCreatedScriptId: string | null = null;
     let newAgentMode = agentMode;
 
     const regex = /<action>([\s\S]*?)<\/action>/g;
-    let match;
     const cleanText = text.replace(regex, '').trim();
 
+    // Reset regex lastIndex before the exec loop
+    regex.lastIndex = 0;
+
+    let match;
     while ((match = regex.exec(text)) !== null) {
       try {
         const action = JSON.parse(match[1]);
@@ -56,24 +62,21 @@ Remember to output standard text describing what you are doing alongside the <ac
             parentId: action.parentId || 'workspace',
             code: action.code || ''
           });
-          
+
           if (action.objectType === 'Script' || action.objectType === 'LocalScript') {
             justCreatedScriptId = newId;
             newAgentMode = 'Coding';
           } else {
             newAgentMode = 'Executing';
           }
-        } 
-        else if (action.type === 'DELETE') {
+        } else if (action.type === 'DELETE') {
           const id = action.id;
           newObjects = newObjects.filter(o => o.id !== id && o.parentId !== id);
           newAgentMode = 'Executing';
+        } else if (action.type === 'RENAME') {
+          newObjects = newObjects.map(o => o.id === action.id ? { ...o, name: action.newName } : o);
+          newAgentMode = 'Executing';
         }
-        else if (action.type === 'RENAME') {
-           newObjects = newObjects.map(o => o.id === action.id ? { ...o, name: action.newName } : o);
-           newAgentMode = 'Executing';
-        }
-        // ignoring MOVE for simplicity in AI parsing, rely on user using context menu
       } catch (e) {
         console.error("Failed to parse AI action", e, match[1]);
       }
@@ -92,9 +95,28 @@ Remember to output standard text describing what you are doing alongside the <ac
     return cleanText;
   };
 
+  const extractRawOutput = (response: unknown): string => {
+    if (typeof response === 'string') return response;
+    if (response && typeof response === 'object') {
+      const r = response as any;
+      if (typeof r.text === 'string') return r.text;
+      if (r.message?.content) {
+        const content = r.message.content;
+        if (typeof content === 'string') return content;
+        if (Array.isArray(content)) {
+          return content
+            .filter((c: any) => c.type === 'text')
+            .map((c: any) => c.text)
+            .join('');
+        }
+      }
+    }
+    return '';
+  };
+
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
-    
+
     const userMsg = input;
     setInput('');
     setIsLoading(true);
@@ -103,7 +125,6 @@ Remember to output standard text describing what you are doing alongside the <ac
     setChatHistory(updatedHistory);
 
     try {
-      // Puter.js chat
       const puter = (window as any).puter;
       if (!puter) throw new Error("Puter.js not loaded");
 
@@ -113,23 +134,7 @@ Remember to output standard text describing what you are doing alongside the <ac
       ];
 
       const response = await puter.ai.chat(messages, { model: 'claude-sonnet-4-6' });
-      let rawOutput = '';
-      if (typeof response === 'string') {
-        rawOutput = response;
-      } else if (response?.message?.content) {
-        const content = response.message.content;
-        if (typeof content === 'string') {
-          rawOutput = content;
-        } else if (Array.isArray(content)) {
-          rawOutput = (content as any[])
-            .filter((c) => c.type === 'text')
-            .map((c) => c.text)
-            .join('');
-        }
-      } else if (typeof response?.text === 'string') {
-        rawOutput = response.text;
-      }
-
+      const rawOutput = extractRawOutput(response);
       const textOutput = processResponseActions(rawOutput);
 
       setChatHistory(prev => [...prev, {
@@ -137,8 +142,7 @@ Remember to output standard text describing what you are doing alongside the <ac
         role: 'assistant',
         content: textOutput || "(Action executed)"
       }]);
-      
-      // Reset mode to standard after a delay
+
       setTimeout(() => {
         setAgentMode('Standard');
       }, 3000);
@@ -161,13 +165,13 @@ Remember to output standard text describing what you are doing alongside the <ac
           <Bot size={14} className="text-[#00a2ff]" /> AI Assistant
         </span>
         <div className="text-[10px] text-[#00a2ff] flex items-center gap-1">
-           {agentMode === 'Executing' ? <PlaySquare size={10} className="text-purple-400" /> : 
-            agentMode === 'Coding' ? <Code2 size={10} className="text-green-400" /> : 
+          {agentMode === 'Executing' ? <PlaySquare size={10} className="text-purple-400" /> :
+            agentMode === 'Coding' ? <Code2 size={10} className="text-green-400" /> :
             <Bot size={10} className="text-[#00a2ff]" />}
-           {agentMode} Mode
+          {agentMode} Mode
         </div>
       </div>
-      
+
       <div className="flex-1 overflow-y-auto p-3 space-y-4 text-xs font-sans custom-scroll">
         {chatHistory.length === 0 ? (
           <div className="text-center text-[#aaaaaa] mt-10">
@@ -210,7 +214,7 @@ Remember to output standard text describing what you are doing alongside the <ac
             placeholder="Ask Assistant..."
             className="w-full bg-[#1b1b1b] border border-[#444444] rounded px-3 py-2 text-xs focus:outline-none focus:border-[#00a2ff] pr-10"
           />
-          <button 
+          <button
             onClick={sendMessage}
             disabled={isLoading || !input.trim()}
             className="absolute right-2 top-2 p-0.5 rounded text-[#666666] hover:text-[#aaaaaa] disabled:opacity-50"
